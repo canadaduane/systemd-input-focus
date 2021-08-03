@@ -1,0 +1,18 @@
+[package]
+name = "sdtalk"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# dbus-async = "~2.2.0"
+# dbus = "~0.9.3"
+libc = "^0.2.98"
+udev = "^0.6.2"
+zbus = "~2.0.0-beta.6"
+zvariant = "~2.8.0"
+
+# [dependencies.tokio]
+# version = "~1.9.0"
+# features = ["fs", "net", "io-util", "process"]

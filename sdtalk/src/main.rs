@@ -1,9 +1,6 @@
 extern crate udev;
 
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, ffi::OsString, path::{Path, PathBuf}};
 
 use udev::{Device, Enumerator};
 use zbus::dbus_proxy;
@@ -71,7 +68,8 @@ enum InputType {
 
 #[derive(PartialEq, Debug)]
 struct DeviceData {
-    system_path: PathBuf,
+    path: PathBuf,
+    name: OsString,
     input_type: InputType,
 }
 
@@ -101,7 +99,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut devices = enumerate_keyboards_for_seat(tag)?;
         for device in devices.scan_devices().unwrap() {
             initial_devices.push(DeviceData {
-                system_path: device.syspath().to_owned(),
+                path: device.syspath().to_owned(),
+                name: device.sysname().to_owned(),
                 input_type: InputType::Keyboard,
             });
         }

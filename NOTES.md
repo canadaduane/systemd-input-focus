@@ -1,5 +1,6 @@
 Requirements: systemd, systemd-logind (i.e. access to loginctl)
 
+
 List all DISPLAY env vars on all processes:
 https://unix.stackexchange.com/a/308985
     $ ps e

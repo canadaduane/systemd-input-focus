@@ -1,6 +1,9 @@
 extern crate udev;
 
-use std::{collections::HashSet};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use udev::{Device, Enumerator};
 use zbus::dbus_proxy;
@@ -42,13 +45,13 @@ fn device_is_keyboard(device: &Device) -> bool {
         .eq("1");
 }
 
-fn device_has_tag(device: &Device, tag: &str) -> bool
-{
+fn device_has_tag(device: &Device, tag: &str) -> bool {
     let wrapped_tag = format!(":{}:", tag);
     return device
         .property_value("TAGS")
         .unwrap_or_default()
-        .to_str().unwrap_or_default()
+        .to_str()
+        .unwrap_or_default()
         .contains(&wrapped_tag);
 }
 
@@ -56,35 +59,56 @@ fn device_has_any_tag(device: Device, tags: HashSet<&str>) -> bool {
     return tags.iter().any(|tag| device_has_tag(&device, tag));
 }
 
+fn seat_as_tag(seat: &str) -> &str {
+    return if seat.eq("seat0") { "seat" } else { seat };
+}
+
+#[derive(PartialEq, Debug)]
+enum InputType {
+    Keyboard,
+    Mouse,
+}
+
+#[derive(PartialEq, Debug)]
+struct DeviceData {
+    system_path: PathBuf,
+    input_type: InputType,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let connection = zbus::Connection::system()?;
 
     let proxy = LoginManagerProxy::new(&connection)?;
 
-    // dbg!(proxy.list_users()?);
+    let seat_results = &proxy.list_seats()?;
+    let seats: Vec<String> = seat_results
+        .iter()
+        .map(|seat| seat.0.to_string())
+        .collect();
 
-    let seats = &proxy.list_seats()?;
-    let seat_tags = seats.iter().map(|seat| &seat.0);
+    dbg!(&seats);
 
-    dbg!(&seat_tags);
+    // let proxy2 = SeatManagerProxy::builder(&connection)
+    //     .path("/org/freedesktop/login1/seat/seat0")?
+    //     .build()
+    //     .unwrap();
 
-    // let sessions = &proxy.list_sessions()?;
+    // dbg!(proxy2.active_session()?);
 
-    // dbg!(sessions);
+    let mut initial_devices: Vec<DeviceData> = Vec::new();
 
-    let proxy2 = SeatManagerProxy::builder(&connection)
-        .path("/org/freedesktop/login1/seat/seat0")?
-        .build()
-        .unwrap();
-
-    dbg!(proxy2.active_session()?);
-
-    let initial_devices = seat_tags.iter().map(|seat| {
-        let &mut enumerator = enumerate_keyboards_for_seat(seat);
-        for (device in enumerator.scan_devices().unwrap()) {
-
+    for tag in seats.iter() {
+        let mut devices = enumerate_keyboards_for_seat(tag)?;
+        for device in devices.scan_devices().unwrap() {
+            initial_devices.push(DeviceData {
+                system_path: device.syspath().to_owned(),
+                input_type: InputType::Keyboard,
+            });
         }
-    });
+    }
+    dbg!(&initial_devices);
+
+    return Ok(());
 
     poll::poll(|event| {
         let device = event.device();
@@ -109,14 +133,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     })?;
 
-    let mut seat0_devices = enumerate_keyboards_for_seat("seat0")?;
-    let mut seat1_devices = enumerate_keyboards_for_seat("seat1")?;
+    // let mut seat0_devices = enumerate_keyboards_for_seat("seat0")?;
+    // let mut seat1_devices = enumerate_keyboards_for_seat("seat1")?;
 
-    println!("seat0 devices:");
-    print_devices(&mut seat0_devices.scan_devices().unwrap());
+    // println!("seat0 devices:");
+    // print_devices(&mut seat0_devices.scan_devices().unwrap());
 
-    println!("seat1 devices:");
-    print_devices(&mut seat1_devices.scan_devices().unwrap());
+    // println!("seat1 devices:");
+    // print_devices(&mut seat1_devices.scan_devices().unwrap());
 
     Ok(())
 }
@@ -126,7 +150,7 @@ fn enumerate_keyboards_for_seat(seat: &str) -> Result<Enumerator, std::io::Error
 
     enumerator.match_subsystem("input")?;
     enumerator.match_property("ID_INPUT_KEYBOARD", "1")?;
-    enumerator.match_tag(if seat.eq("seat0") { "seat" } else { seat })?;
+    enumerator.match_tag(seat_as_tag(seat))?;
 
     Ok(enumerator)
 }

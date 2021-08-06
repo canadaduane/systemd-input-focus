@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use async_channel::Sender;
-use futures_util::future::ready;
+use futures::future::ready;
 use futures_util::stream::StreamExt;
 use tokio_udev::{AsyncMonitorSocket, MonitorBuilder};
 
@@ -19,23 +19,36 @@ pub async fn listen(sender: Sender<DeviceChange>) {
         .try_into()
         .expect("Couldn't create AsyncMonitorSocket");
 
+    monitor.for_each(|event| async {
+        if let Ok(event) = event {
+            sender.send(DeviceChange::Added {
+                syspath: event.device().syspath().to_owned(),
+            }).await.expect("unable to send");
+        }
+        ()
+    }).await;
+
+    /*
     monitor
         .for_each_concurrent(1, |event| async {
             if let Ok(event) = event {
-                sender
-                    .send(DeviceChange::Added {
-                        syspath: event.device().syspath().to_owned(),
-                    })
-                    .await
-                    .expect("Failed to send udev");
+                match event.event_type() {
+                    tokio_udev::EventType::Add => sender
+                        .send(DeviceChange::Added {
+                            syspath: event.device().syspath().to_owned(),
+                        })
+                        .await
+                        .expect("Failed to send udev"),
+                    tokio_udev::EventType::Remove => sender
+                        .send(DeviceChange::Removed {
+                            syspath: event.device().syspath().to_owned(),
+                        })
+                        .await
+                        .expect("Failed to send udev"),
+                    _ => (),
+                }
             }
-            ()
         })
         .await;
+        */
 }
-
-// println!(
-//     "Hotplug event: {}: {}",
-//     event.event_type(),
-//     event.device().syspath().display()
-// );

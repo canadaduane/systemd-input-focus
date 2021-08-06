@@ -8,9 +8,12 @@ edition = "2018"
 [dependencies]
 # dbus-async = "~2.2.0"
 # dbus = "~0.9.3"
+async-channel = "1"
 futures = "~0.3"
+futures-util = "~0.3"
 libc = "^0.2.98"
 tokio = { version = "1", features = ["full"] }
+tokio-udev = "~0.7.0"
 udev = "^0.6.2"
 zbus = "~2.0.0-beta.6"
 zvariant = "~2.8.0"

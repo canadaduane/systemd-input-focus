@@ -1,15 +1,22 @@
-use std::convert::TryInto;
-
+use async_channel::Sender;
 use futures::TryStreamExt;
 use tokio::task;
-use async_channel::Sender;
-use futures_util::stream::StreamExt;
-use tokio_udev::{AsyncMonitorSocket, MonitorBuilder};
 
 use crate::messages::DeviceChange;
 
 pub async fn spawn_local(sender: Sender<DeviceChange>) -> tokio::task::JoinHandle<()> {
-    let conn = zbus::azync::Connection::system().await.expect("Couldn't connect to dbus");
+    let conn = zbus::azync::Connection::system()
+        .await
+        .expect("Couldn't connect to dbus");
+
+    conn.call_method(
+        Some("org.freedesktop.DBus"),
+        "/org/freedesktop/DBus",
+        Some("org.freedesktop.DBus.Monitoring"),
+        "BecomeMonitor",
+        &(&[] as &[&str], 0u32),
+    )
+    .await.expect("Couldn't call monitor method");
 
     task::spawn_local(async move {
         loop {

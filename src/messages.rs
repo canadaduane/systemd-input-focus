@@ -9,3 +9,13 @@ pub enum DeviceChange {
         syspath: PathBuf
     }
 }
+
+#[derive(Debug)]
+pub enum SessionChange {
+    Added {
+        session_id: String
+    },
+    Removed {
+        session_id: String
+    }
+}

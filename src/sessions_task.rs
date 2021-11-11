@@ -3,11 +3,14 @@ use futures::TryStreamExt;
 use tokio::task;
 
 use crate::messages::DeviceChange;
+use crate::sessions::LoginProxy;
 
 pub async fn spawn_local(sender: Sender<DeviceChange>) -> tokio::task::JoinHandle<()> {
     let conn = zbus::azync::Connection::system()
         .await
         .expect("Couldn't connect to dbus");
+    
+    let login_proxy = LoginProxy::new(&conn);
 
     conn.call_method(
         Some("org.freedesktop.DBus"),

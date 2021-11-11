@@ -1,10 +1,17 @@
 use std::collections::HashMap;
 use std::iter::Map;
 
+//use async_channel::Sender;
+use futures::TryFutureExt;
+use zbus::SignalHandlerId;
 use zbus::dbus_proxy;
-use zbus::Connection;
+use zbus::azync::Connection;
 use zvariant::OwnedObjectPath;
 
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::{channel, Receiver};
+
+use crate::messages::SessionChange;
 
 #[derive(Debug)]
 pub struct Session {
@@ -20,7 +27,7 @@ pub struct Session {
     default_service = "org.freedesktop.login1",
     default_path = "/org/freedesktop/login1"
 )]
-trait LoginManager {
+pub trait LoginManager {
     fn list_users(&self) -> zbus::Result<Vec<(u32, String, OwnedObjectPath)>>;
 
     fn list_sessions(&self) -> zbus::Result<Vec<(String, u32, String, String, OwnedObjectPath)>>;
@@ -30,6 +37,36 @@ trait LoginManager {
     fn list_seats(&self) -> zbus::Result<Vec<(String, OwnedObjectPath)>>;
 
     fn get_seat(&self, seat_id: &str) -> zbus::Result<OwnedObjectPath>;
+
+    #[dbus_proxy(signal)]
+    fn session_new(&self, session_id: &str, object_path: OwnedObjectPath) -> zbus::Result<()>;
+}
+
+pub struct LoginProxy<'a>(LoginManagerProxy<'a>);
+
+impl<'a> LoginProxy<'a> {
+    #[inline]
+    pub fn new(conn: &Connection) -> zbus::Result<Self> {
+        Ok(LoginProxy(LoginManagerProxy::new(conn)?))
+    }
+
+    #[inline]
+    pub fn proxy(&self) -> &LoginManagerProxy<'a> {
+        &self.0
+    }
+
+    #[inline]
+    pub fn connect_session_new(&self, sender: Sender<SessionChange>) -> zbus::fdo::Result<SignalHandlerId> {
+        self.0
+            .connect_session_new(move |session_id: &str, object_path: OwnedObjectPath| {
+                sender
+                    .send(SessionChange::Added {
+                        session_id: session_id.to_owned(),
+                    })
+                    .map_err(|err| zbus::fdo::Error::Failed(err.to_string()))?;
+                Ok(())
+            })
+    }
 }
 
 #[dbus_proxy(
@@ -37,7 +74,7 @@ trait LoginManager {
     default_service = "org.freedesktop.login1",
     default_path = "/org/freedesktop/login1/seat"
 )]
-trait SeatManager {
+pub trait SeatManager {
     #[dbus_proxy(property)]
     fn active_session(&self) -> zbus::Result<(String, OwnedObjectPath)>;
 }

@@ -6,6 +6,9 @@ mod sessions_task;
 mod messages;
 use messages::DeviceChange;
 
+mod sessions;
+use sessions::LoginManagerProxy;
+
 // type Db = Arc<Mutex<HashMap<String, String>>>;
 
 #[tokio::main]
